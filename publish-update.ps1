@@ -31,9 +31,12 @@ if ($Verzija -notmatch '^\d+\.\d+(\.\d+)?$') {
 if (-not (Test-Path -LiteralPath $Izvor)) {
     throw "Izvorni folder ne postoji: $Izvor"
 }
-$fajlovi = Get-ChildItem -LiteralPath $Izvor -Recurse -File
+# Puna putanja iz istog izvora kao FullName na stavkama, da se relativne
+# putanje racunaju tacno i kad je prosledjeno kratko 8.3 ime.
+$baza = (Get-Item -LiteralPath $Izvor).FullName.TrimEnd('\')
+$fajlovi = Get-ChildItem -LiteralPath $baza -Recurse -File
 if ($fajlovi.Count -eq 0) {
-    throw "Izvorni folder je prazan: $Izvor"
+    throw "Izvorni folder je prazan: $baza"
 }
 
 $stari = Get-Content -LiteralPath $Manifest -Raw | ConvertFrom-Json
@@ -46,8 +49,10 @@ if ($MinVerzija -notmatch '^\d+\.\d+(\.\d+)?$') {
 }
 
 $tag = "v$Verzija"
-gh release view $tag --repo $Repo 1>$null 2>$null
-if ($LASTEXITCODE -eq 0) { throw "Release $tag vec postoji na $Repo" }
+# Preko cmd-a, da PowerShell 5.1 ne pretvori stderr od gh u terminating error.
+cmd /c "gh release view $tag --repo $Repo >nul 2>&1"
+$vecPostoji = ($LASTEXITCODE -eq 0)
+if ($vecPostoji) { throw "Release $tag vec postoji na $Repo" }
 
 # --- pakovanje ----------------------------------------------------------------
 
@@ -55,10 +60,28 @@ $imeZipa = "$Prefiks-v$Verzija-update.zip"
 $zip = Join-Path $Koren $imeZipa
 if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
 
+Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::CreateFromDirectory(
-    (Resolve-Path -LiteralPath $Izvor).Path, $zip,
-    [System.IO.Compression.CompressionLevel]::Optimal, $false)
+
+# Rucno pakovanje umesto CreateFromDirectory, jer ono na .NET Frameworku upisuje
+# putanje sa obrnutom kosom crtom. ZIP standard trazi '/', a neki alati inace
+# naprave fajl doslovno nazvan "Reports\racun.rpt" umesto podfoldera.
+$tok = $null
+$arh = $null
+try {
+    $tok = [System.IO.File]::Create($zip)
+    $arh = New-Object System.IO.Compression.ZipArchive($tok, [System.IO.Compression.ZipArchiveMode]::Create)
+    foreach ($f in $fajlovi) {
+        $rel = $f.FullName.Substring($baza.Length).TrimStart('\').Replace('\', '/')
+        $ulaz = $arh.CreateEntry($rel, [System.IO.Compression.CompressionLevel]::Optimal)
+        $izlazni = $ulaz.Open()
+        $ulazni  = [System.IO.File]::OpenRead($f.FullName)
+        try { $ulazni.CopyTo($izlazni) } finally { $ulazni.Dispose(); $izlazni.Dispose() }
+    }
+} finally {
+    if ($arh) { $arh.Dispose() }
+    if ($tok) { $tok.Dispose() }
+}
 
 $hash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLower()
 $vel  = (Get-Item -LiteralPath $zip).Length
@@ -72,14 +95,14 @@ Write-Output "velicina : $([math]::Round($vel/1KB,1)) KB"
 Write-Output "sha256   : $hash"
 Write-Output "fajlova  : $($fajlovi.Count)"
 $fajlovi | ForEach-Object {
-    Write-Output ("   " + $_.FullName.Substring((Resolve-Path -LiteralPath $Izvor).Path.Length + 1))
+    Write-Output ("   " + $_.FullName.Substring($baza.Length).TrimStart('\'))
 }
 
 if (-not $Apply) {
     Write-Output ""
     Write-Output "Probni prolaz. Zip je napravljen ali nista nije objavljeno."
     Write-Output "Pokreni sa -Apply da objavis."
-    return
+    exit 0
 }
 
 # --- objava -------------------------------------------------------------------
