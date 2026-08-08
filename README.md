@@ -70,6 +70,59 @@ mps-posmarket-v3.0.2-update.zip
     └── racun.rpt
 ```
 
+## Prvo podešavanje na novom računaru
+
+**1. Pristup.** Nalog mora biti član organizacije `atr-milenijum` sa **Write** dozvolom na
+ovom repozitorijumu. Vlasnik dodaje kroz Settings → Collaborators and teams. Bez toga
+`gh release create` odbija objavu.
+
+**2. Alati.**
+
+```powershell
+winget install Git.Git
+winget install GitHub.cli
+```
+
+Zatvori pa otvori novi terminal da se PATH osveži.
+
+**3. Prijava.** Svako se prijavljuje **svojim** nalogom, organizacija se ne loguje zasebno:
+
+```powershell
+gh auth login
+```
+
+GitHub.com → HTTPS → Y za git kredencijale → Login with a web browser.
+
+**4. Git identitet**, ako već nije podešen — ide u commit poruku manifesta:
+
+```powershell
+git config --global user.name "Ime Prezime"
+git config --global user.email "ime@ms.rs"
+```
+
+**5. Kloniraj:**
+
+```powershell
+git clone https://github.com/atr-milenijum/posmarket-updates.git
+cd posmarket-updates
+```
+
+Ako PowerShell odbije da pokrene skriptu zbog ExecutionPolicy:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+```
+
+Važi samo za taj prozor i ne menja podešavanja mašine.
+
+## Kad više ljudi objavljuje
+
+Skripta na početku sama radi `git pull --rebase`, pa nema potrebe da to radiš ručno.
+Ako pull pukne, skripta staje **pre** nego što išta objavi — reši konflikt pa pokreni ponovo.
+
+Dva čoveka ne treba da objavljuju istovremeno. Tag verzije je jedinstven, pa će drugi
+dobiti grešku „release već postoji", ali je jednostavnije dogovoriti se ko objavljuje.
+
 ## Objava nove verzije
 
 ```powershell

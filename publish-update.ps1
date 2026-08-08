@@ -39,6 +39,14 @@ if ($fajlovi.Count -eq 0) {
     throw "Izvorni folder je prazan: $baza"
 }
 
+# Povuci pre svega ostalog. Bez ovoga se provera verzije radi nad zastarelim
+# latest.json ako je neko drugi u medjuvremenu objavio, a push bi pukao tek na
+# kraju - posle sto je release vec napravljen.
+git -C $Koren pull --rebase -q origin main
+if ($LASTEXITCODE -ne 0) {
+    throw "git pull nije uspeo. Resi to pre objave - inace radis nad zastarelim manifestom."
+}
+
 $stari = Get-Content -LiteralPath $Manifest -Raw | ConvertFrom-Json
 if ([version]$Verzija -le [version]$stari.verzija) {
     throw "Verzija $Verzija nije novija od trenutne $($stari.verzija) u latest.json"
