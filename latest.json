@@ -1,0 +1,11 @@
+{
+  "proizvod": "posmarket",
+  "verzija": "3.0.1",
+  "datum": "2026-08-08",
+  "url": null,
+  "sha256": null,
+  "velicina": 0,
+  "min_verzija": "3.0.0",
+  "obavezan": false,
+  "napomene": "Trenutna verzija u prometu. Jos nema objavljenog update paketa."
+}

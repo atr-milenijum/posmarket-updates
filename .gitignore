@@ -1,0 +1,6 @@
+# Update paketi se ne commituju - idu u Releases.
+*.zip
+
+# Windows
+Thumbs.db
+desktop.ini
